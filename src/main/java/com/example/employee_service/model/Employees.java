@@ -2,6 +2,7 @@ package com.example.employee_service.model;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 public class Employees {
 
@@ -17,5 +18,11 @@ public class Employees {
 
     public void addEmployee(Employee employee) {
         employeeList.add(employee);
+    }
+
+    public Optional<Employee> findById(String employeeId) {
+        return employeeList.stream()
+                .filter(e -> e.getEmployeeId().equals(employeeId))
+                .findFirst();
     }
 }
