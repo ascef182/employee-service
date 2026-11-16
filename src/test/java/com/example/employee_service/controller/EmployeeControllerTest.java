@@ -86,4 +86,34 @@ class EmployeeControllerTest {
                         .content("not json"))
                 .andExpect(status().isUnsupportedMediaType());
     }
+        @Test
+    void postRejectsDuplicateEmployeeId() throws Exception {
+        String body = """
+                {"employee_id":"001","first_name":"Eva","last_name":"Reis",
+                 "email":"eva@empresa.com","title":"DevOps"}
+                """;
+
+        mockMvc.perform(post("/employees")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isConflict());
+
+        assertEquals(2, employees.getEmployeeList().size());
+    }
+
+    @Test
+    void postRejectsMissingEmployeeId() throws Exception {
+        String body = """
+                {"first_name":"Eva","last_name":"Reis",
+                 "email":"eva@empresa.com","title":"DevOps"}
+                """;
+
+        mockMvc.perform(post("/employees")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest());
+
+        assertEquals(2, employees.getEmployeeList().size());
+    }
+
 }
