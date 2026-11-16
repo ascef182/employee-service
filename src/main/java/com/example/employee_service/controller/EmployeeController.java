@@ -11,6 +11,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
+import com.example.employee_service.model.Employees;
+import org.springframework.http.HttpStatus;
+
 
 import java.net.URI;
 import java.util.List;
@@ -37,16 +40,27 @@ public class EmployeeController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
+      @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<Employee> addEmployee(@RequestBody Employee employee) {
-        employeeManager.getEmployees().addEmployee(employee);
+        String id = employee.getEmployeeId();
+        if (id == null || id.isBlank()) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        Employees employees = employeeManager.getEmployees();
+        if (employees.findById(id).isPresent()) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).build();
+        }
+
+        employees.addEmployee(employee);
 
         URI location = ServletUriComponentsBuilder
                 .fromCurrentRequest()
                 .path("/{id}")
-                .buildAndExpand(employee.getEmployeeId())
+                .buildAndExpand(id)
                 .toUri();
 
         return ResponseEntity.created(location).body(employee);
     }
+
 }
