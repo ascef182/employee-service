@@ -108,7 +108,7 @@ You should see the four seeded employees as JSON.
 
 Developed on the `feat/post-employees` branch and merged into `main` through a pull request.
 
-**Goal:** let clients add a new employee by sending JSON with `POST /employees`.
+**Goal:** let clients add a new employee by sending JSON with `POST /employees`, and fetch a single employee by ID.
 
 **Step 1. Prepare the `Employee` model.** Spring needs a no-argument constructor and setters to build an object from JSON. The `@JsonProperty` annotation maps the snake_case JSON keys (`employee_id`, `first_name`, `last_name`) to the camelCase Java fields.
 
@@ -117,18 +117,35 @@ Developed on the `feat/post-employees` branch and merged into `main` through a p
 private String employeeId;
 ```
 
-**Step 2. Add the POST endpoint.** In `EmployeeController`, `@PostMapping` handles `POST /employees`, `@RequestBody` converts the JSON into an `Employee`, and `@ResponseStatus(HttpStatus.CREATED)` answers with `201 Created`.
+**Step 2. Add the POST endpoint.** In `EmployeeController`, `@PostMapping` handles `POST /employees` and `@RequestBody` converts the JSON into an `Employee`. The endpoint answers `201 Created` with a `Location` header pointing to the new resource, which is the REST convention for creation. `consumes` makes it reject any content type other than JSON with `415`.
 
 ```java
-@PostMapping
-@ResponseStatus(HttpStatus.CREATED)
-public Employee addEmployee(@RequestBody Employee employee) {
+@PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
+public ResponseEntity<Employee> addEmployee(@RequestBody Employee employee) {
     employeeManager.getEmployees().addEmployee(employee);
-    return employee;
+
+    URI location = ServletUriComponentsBuilder
+            .fromCurrentRequest()
+            .path("/{id}")
+            .buildAndExpand(employee.getEmployeeId())
+            .toUri();
+
+    return ResponseEntity.created(location).body(employee);
 }
 ```
 
-**Step 3. Build, run and test.**
+**Step 3. Add `GET /employees/{id}`.** The `Location` header needs a URL that works, so this endpoint returns one employee, or `404` when the ID does not exist. The lookup lives in `Employees.findById`, which returns an `Optional<Employee>`.
+
+```java
+@GetMapping("/{id}")
+public ResponseEntity<Employee> getEmployee(@PathVariable String id) {
+    return employeeManager.getEmployees().findById(id)
+            .map(ResponseEntity::ok)
+            .orElse(ResponseEntity.notFound().build());
+}
+```
+
+**Step 4. Build, run and test.**
 
 ```bash
 curl -i -X POST http://localhost:8080/employees \
@@ -136,9 +153,17 @@ curl -i -X POST http://localhost:8080/employees \
   -d '{"employee_id":"005","first_name":"Eva","last_name":"Reis","email":"eva@empresa.com","title":"DevOps"}'
 
 curl http://localhost:8080/employees
+curl http://localhost:8080/employees/005
 ```
 
-The POST returns `201` and the new employee appears in the list. Data is kept in memory, so it is lost when the app restarts.
+| Request | Result |
+|---------|--------|
+| `POST /employees` with valid JSON | `201 Created` and `Location: http://localhost:8080/employees/005` |
+| `GET /employees/005` | `200` with the employee |
+| `GET /employees/999` | `404 Not Found` |
+| `POST /employees` with a non-JSON body | `415 Unsupported Media Type` |
+
+Data is kept in memory, so it is lost when the app restarts.
 
 ### Task 4: Unit tests (planned)
 
