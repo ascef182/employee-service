@@ -15,7 +15,7 @@ A small RESTful web service built with **Java** and **Spring Boot** that manages
 |---|------|--------|
 | 1 | Write a proposal for a RESTful web service | Done |
 | 2 | Build a basic RESTful web service | Done |
-| 3 | Upload JSON data | Planned |
+| 3 | Upload JSON data | In progress (branch `feat/post-employees`) |
 | 4 | Create unit tests | Planned |
 
 ## Getting started
@@ -37,10 +37,10 @@ Expected response:
 
 ```json
 [
-  {"employeeId":"001","firstName":"Ana","lastName":"Silva","email":"ana@empresa.com","title":"Developer"},
-  {"employeeId":"002","firstName":"Bruno","lastName":"Costa","email":"bruno@empresa.com","title":"Designer"},
-  {"employeeId":"003","firstName":"Carla","lastName":"Souza","email":"carla@empresa.com","title":"Product Manager"},
-  {"employeeId":"004","firstName":"Diego","lastName":"Lima","email":"diego@empresa.com","title":"QA Analyst"}
+  {"employee_id":"001","first_name":"Ana","last_name":"Silva","email":"ana@empresa.com","title":"Developer"},
+  {"employee_id":"002","first_name":"Bruno","last_name":"Costa","email":"bruno@empresa.com","title":"Designer"},
+  {"employee_id":"003","first_name":"Carla","last_name":"Souza","email":"carla@empresa.com","title":"Product Manager"},
+  {"employee_id":"004","first_name":"Diego","last_name":"Lima","email":"diego@empresa.com","title":"QA Analyst"}
 ]
 ```
 
@@ -104,9 +104,66 @@ curl http://localhost:8080/employees
 
 You should see the four seeded employees as JSON.
 
-### Task 3: Upload JSON data (planned)
+### Task 3: Upload JSON data
 
-Add an endpoint that accepts a JSON payload and adds employees to the list.
+Developed on the `feat/post-employees` branch and merged into `main` through a pull request.
+
+**Goal:** let clients add a new employee by sending JSON with `POST /employees`, and fetch a single employee by ID.
+
+**Step 1. Prepare the `Employee` model.** Spring needs a no-argument constructor and setters to build an object from JSON. The `@JsonProperty` annotation maps the snake_case JSON keys (`employee_id`, `first_name`, `last_name`) to the camelCase Java fields.
+
+```java
+@JsonProperty("employee_id")
+private String employeeId;
+```
+
+**Step 2. Add the POST endpoint.** In `EmployeeController`, `@PostMapping` handles `POST /employees` and `@RequestBody` converts the JSON into an `Employee`. The endpoint answers `201 Created` with a `Location` header pointing to the new resource, which is the REST convention for creation. `consumes` makes it reject any content type other than JSON with `415`.
+
+```java
+@PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
+public ResponseEntity<Employee> addEmployee(@RequestBody Employee employee) {
+    employeeManager.getEmployees().addEmployee(employee);
+
+    URI location = ServletUriComponentsBuilder
+            .fromCurrentRequest()
+            .path("/{id}")
+            .buildAndExpand(employee.getEmployeeId())
+            .toUri();
+
+    return ResponseEntity.created(location).body(employee);
+}
+```
+
+**Step 3. Add `GET /employees/{id}`.** The `Location` header needs a URL that works, so this endpoint returns one employee, or `404` when the ID does not exist. The lookup lives in `Employees.findById`, which returns an `Optional<Employee>`.
+
+```java
+@GetMapping("/{id}")
+public ResponseEntity<Employee> getEmployee(@PathVariable String id) {
+    return employeeManager.getEmployees().findById(id)
+            .map(ResponseEntity::ok)
+            .orElse(ResponseEntity.notFound().build());
+}
+```
+
+**Step 4. Build, run and test.**
+
+```bash
+curl -i -X POST http://localhost:8080/employees \
+  -H "Content-Type: application/json" \
+  -d '{"employee_id":"005","first_name":"Eva","last_name":"Reis","email":"eva@empresa.com","title":"DevOps"}'
+
+curl http://localhost:8080/employees
+curl http://localhost:8080/employees/005
+```
+
+| Request | Result |
+|---------|--------|
+| `POST /employees` with valid JSON | `201 Created` and `Location: http://localhost:8080/employees/005` |
+| `GET /employees/005` | `200` with the employee |
+| `GET /employees/999` | `404 Not Found` |
+| `POST /employees` with a non-JSON body | `415 Unsupported Media Type` |
+
+Data is kept in memory, so it is lost when the app restarts.
 
 ### Task 4: Unit tests (planned)
 
