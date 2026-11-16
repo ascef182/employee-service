@@ -62,7 +62,7 @@ class EmployeeControllerTest {
                 .andExpect(status().isNotFound());
     }
 
-    @Test
+        @Test
     void postCreatesEmployeeAndReturnsLocation() throws Exception {
         String body = """
                 {"employee_id":"010","first_name":"Eva","last_name":"Reis",
@@ -74,9 +74,20 @@ class EmployeeControllerTest {
                         .content(body))
                 .andExpect(status().isCreated())
                 .andExpect(header().string("Location", "http://localhost/employees/010"))
-                .andExpect(jsonPath("$.first_name", is("Eva")));
+                .andExpect(jsonPath("$.employee_id", is("010")))
+                .andExpect(jsonPath("$.first_name", is("Eva")))
+                .andExpect(jsonPath("$.last_name", is("Reis")))
+                .andExpect(jsonPath("$.email", is("eva@empresa.com")))
+                .andExpect(jsonPath("$.title", is("DevOps")));
 
         assertEquals(3, employees.getEmployeeList().size());
+
+        Employee saved = employees.findById("010").orElseThrow();
+        assertEquals("010", saved.getEmployeeId());
+        assertEquals("Eva", saved.getFirstName());
+        assertEquals("Reis", saved.getLastName());
+        assertEquals("eva@empresa.com", saved.getEmail());
+        assertEquals("DevOps", saved.getTitle());
     }
 
     @Test

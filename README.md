@@ -206,7 +206,7 @@ void setUp() {
 
 1. **Red:** write tests that demand the correct behavior (`409` and `400`) and watch them fail.
 2. **Green:** fix the controller, validating the input first (`400`), then the business rule (`409`), and only then saving.
-3. The commit history shows both steps: `test: add failing tests for duplicate and missing employee id`, then `fix: reject duplicate or missing employee_id on POST`.
+3. Both steps were separate commits (`test: add failing tests for duplicate and missing employee id`, then `fix: reject duplicate or missing employee_id on POST`). They are visible in pull request #2 and listed in its squash commit message.
 
 **What is covered**
 
@@ -215,7 +215,7 @@ void setUp() {
 | List all employees | `getAllReturnsAllEmployees` |
 | Get one employee | `getByIdReturnsTheEmployee` |
 | Unknown id returns `404` | `getByIdReturns404WhenMissing` |
-| Create returns `201` and `Location` | `postCreatesEmployeeAndReturnsLocation` |
+| Create returns `201`, `Location`, and all five fields in the response and in the stored object | `postCreatesEmployeeAndReturnsLocation` |
 | Non-JSON body returns `415` | `postRejectsNonJsonContent` |
 | Duplicate id returns `409` | `postRejectsDuplicateEmployeeId` |
 | Missing id returns `400` | `postRejectsMissingEmployeeId` |
