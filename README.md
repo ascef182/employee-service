@@ -15,8 +15,8 @@ A small RESTful web service built with **Java** and **Spring Boot** that manages
 |---|------|--------|
 | 1 | Write a proposal for a RESTful web service | Done |
 | 2 | Build a basic RESTful web service | Done |
-| 3 | Upload JSON data | In progress (branch `feat/post-employees`) |
-| 4 | Create unit tests | Planned |
+| 3 | Upload JSON data | Done |
+| 4 | Create unit tests | Done (branch `test/unit-tests`) |
 
 ## Getting started
 
@@ -162,12 +162,63 @@ curl http://localhost:8080/employees/005
 | `GET /employees/005` | `200` with the employee |
 | `GET /employees/999` | `404 Not Found` |
 | `POST /employees` with a non-JSON body | `415 Unsupported Media Type` |
+| `POST /employees` with an existing `employee_id` | `409 Conflict` |
+| `POST /employees` without `employee_id` | `400 Bad Request` |
 
 Data is kept in memory, so it is lost when the app restarts.
 
-### Task 4: Unit tests (planned)
+### Task 4: Unit tests
 
-Cover the model, manager and controller with JUnit 5 and Spring's MockMvc.
+Developed on the `test/unit-tests` branch. The suite has **15 tests** and runs in a few seconds.
+
+```bash
+./gradlew cleanTest test
+```
+
+`cleanTest` forces a fresh run. Without it, Gradle skips the tests when nothing changed. The HTML report is in `build/reports/tests/test/index.html`.
+
+**Step 1. Choose a strategy by layer.**
+
+| Layer | Class | Approach |
+|-------|-------|----------|
+| Model | `EmployeesTest`, `EmployeeManagerTest` | Plain JUnit 5, no Spring, so they run in milliseconds |
+| Web | `EmployeeControllerTest` | `@WebMvcTest` with `MockMvc`, no real server |
+
+**Step 2. Write the model tests.** Each test checks one behavior and follows Arrange, Act, Assert. `@BeforeEach` builds fresh objects so tests never depend on each other or on execution order.
+
+**Step 3. Isolate the controller.** `@WebMvcTest` loads only the web layer, so `EmployeeManager` is replaced by a mock with `@MockitoBean`. Each test gets a fresh list of employees, which avoids flaky tests caused by shared state in a singleton.
+
+```java
+@MockitoBean
+private EmployeeManager employeeManager;
+
+@BeforeEach
+void setUp() {
+    employees = new Employees();
+    employees.addEmployee(new Employee("001", "Ana", "Silva", "ana@empresa.com", "Developer"));
+    when(employeeManager.getEmployees()).thenReturn(employees);
+}
+```
+
+> Spring Boot 4 note: many tutorials still use Spring Boot 2. In Spring Boot 4, `@MockBean` became `@MockitoBean` and `@WebMvcTest` moved to `org.springframework.boot.webmvc.test.autoconfigure`.
+
+**Step 4. Hunt for bugs with TDD.** Asking "what can a client send that I did not plan for?" revealed two bugs in `POST /employees`: a duplicate `employee_id` was accepted, and a missing one produced `Location: /employees/null` and later a `NullPointerException` in the lookup.
+
+1. **Red:** write tests that demand the correct behavior (`409` and `400`) and watch them fail.
+2. **Green:** fix the controller, validating the input first (`400`), then the business rule (`409`), and only then saving.
+3. The commit history shows both steps: `test: add failing tests for duplicate and missing employee id`, then `fix: reject duplicate or missing employee_id on POST`.
+
+**What is covered**
+
+| Behavior | Test |
+|----------|------|
+| List all employees | `getAllReturnsAllEmployees` |
+| Get one employee | `getByIdReturnsTheEmployee` |
+| Unknown id returns `404` | `getByIdReturns404WhenMissing` |
+| Create returns `201` and `Location` | `postCreatesEmployeeAndReturnsLocation` |
+| Non-JSON body returns `415` | `postRejectsNonJsonContent` |
+| Duplicate id returns `409` | `postRejectsDuplicateEmployeeId` |
+| Missing id returns `400` | `postRejectsMissingEmployeeId` |
 
 ## Project structure
 
@@ -180,6 +231,14 @@ src/main/java/com/example/employee_service
     ├── Employee.java
     ├── EmployeeManager.java
     └── Employees.java
+
+src/test/java/com/example/employee_service
+├── EmployeeServiceApplicationTests.java
+├── controller
+│   └── EmployeeControllerTest.java
+└── model
+    ├── EmployeeManagerTest.java
+    └── EmployeesTest.java
 ```
 
 ## Design notes
